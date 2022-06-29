@@ -6,8 +6,8 @@
 #include <FlashStorage.h>
 #include "main.h"
 
-#define F_R 0
-#define R_L 1
+#define F_R 0   //Front rear
+#define R_L 1   //Right left
 #define sensorInt 6
 #define sensorExt 7
 #define speed 8
@@ -32,7 +32,8 @@ unsigned long time2out = 0;
 unsigned long time2center = 0;
 unsigned long endOfMove = 0;
 unsigned int bounceTime = 5;
-unsigned int bounceTimeSensors = 100;
+unsigned int bounceTimeSensors = 2000;
+unsigned int movesPeriod = 10000;
 
 bool lastButton = false;
 
@@ -85,10 +86,16 @@ void setup() {
   bounceExt.attach(sensorExt, INPUT);
   bounceExt.interval(bounceTimeSensors);
 
-  if (!delta_storage.read() && !moveDuration_ms_storage.read()){ //s'il n'y a rien en mémoire, alors on utilise les valeurs par défaut et on les enregistre
+  if (!delta_storage.read()){ //s'il n'y a rien en mémoire, alors on utilise les valeurs par défaut et on les enregistre
     delta = int(UINT8_MAX / 4);
-    moveDuration_ms = 500;
     delta_storage.write(delta);
+  }
+  else{ //sinon on charge les valeurs stockées
+    delta = delta_storage.read();
+  }
+
+   if (!moveDuration_ms_storage.read()){ //s'il n'y a rien en mémoire, alors on utilise les valeurs par défaut et on les enregistre
+    moveDuration_ms = 5000;
     moveDuration_ms_storage.write(moveDuration_ms);
   }
   else{ //sinon on charge les valeurs stockées
@@ -113,7 +120,7 @@ void loop() {
   }*/
 
   machine.run();
-  //delay(5);
+  delay(100);
 
   if(Serial.available() > 0){
     String data = Serial.readStringUntil(0x0D);
@@ -155,12 +162,12 @@ void state0(){
     if (bounceTC.read()){ //tension
       analogWrite(R_L, 127);
       analogWrite(F_R, consigne);
-      //Serial.println("state0: Tension = "+String(consigne));
+      Serial.println("state0: Tension = "+String(consigne));
     }
     else if (!bounceTC.read()){ //centrage
       analogWrite(F_R, 127);
       analogWrite(R_L, consigne);
-      //Serial.println("state0: Centrage = "+String(consigne));
+      Serial.println("state0: Centrage = "+String(consigne));
     }
   }
 }
@@ -200,7 +207,7 @@ void state2(){
     nCentrage++;
   }
   unsigned long now = millis();
-  if (now-last_outLoop > 60000){
+  if (now-last_outLoop > movesPeriod){
     nCentrage++;
     move(sign, delta, moveDuration_ms, "state2: centrage "+String(nCentrage));
     last_outLoop = millis();
@@ -269,6 +276,7 @@ int joystickRead(){
       value += analogRead(joystick);
   }
   value /= iter;
+  Serial.println("Joystick analog value "+String(value));
   if (DEBUG){
     int min_joy = pow(2,12)/2; 
     int max_joy = pow(2,12)/2;
